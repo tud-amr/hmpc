@@ -1,0 +1,7 @@
+gazebo_dev: {ubuntu: []}
+gazebo_plugins: {ubuntu: []}
+gazebo_ros: {ubuntu: []}
+gazebo_ros_control: {ubuntu: []}
+mavlink_sitl_gazebo: {ubuntu: []}
+rqt_reconfigure: {ubuntu: []}
+rviz: {ubuntu: []}

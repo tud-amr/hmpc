@@ -1,0 +1,114 @@
+# Select base image
+FROM nvcr.io/nvidia/l4t-base:r35.1.0
+
+# Set environment variables that persist in the container
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_DISTRO=noetic
+ARG ROS_PKG=ros-base
+ENV ROS_ROOT=/opt/ros/$ROS_DISTRO
+ENV ROSDEP_SOURCES=/etc/ros/rosdep/sources.list.d
+ENV TZ=Europe/Amsterdam
+ENV ROOT=/root
+ENV DEV=$ROOT/dev
+ENV GIT_ROOT=$DEV/git_root
+ENV WS=$GIT_ROOT/src/catkin_ws
+
+# Change the default shell to Bash to run RUN commands in this file
+SHELL [ "/bin/bash", "-c" ]
+
+# Install ubuntu packages
+RUN apt update \
+    && apt install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        curl \
+        git \
+        jq \
+        libopencv-dev \
+        lsb-release \
+        openssh-client \
+        psmisc \
+        python3-pip \
+        python3-venv \
+        sudo \
+        tmux \
+        tmuxinator \
+        unzip \
+        vim \
+        wget \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ROS
+# ---------------------------------------------
+# Add ROS repositories
+RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' \
+    && curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
+    
+# Install ROS and rosdep
+RUN apt update \
+    && apt install -y --no-install-recommends \
+        ros-${ROS_DISTRO}-${ROS_PKG} \
+        python3-catkin-tools \
+        python3-rosdep \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Initialize rosdep
+RUN rosdep init
+# ---------------------------------------------
+
+# Copy the git directory into the container to allow for version control in container
+COPY .. $GIT_ROOT
+
+# Copy config files
+COPY src/config_files/.config/ $ROOT/.config
+COPY src/config_files/dotfiles $ROOT
+COPY src/config_files/rosdep_ignore_lab.yaml $ROSDEP_SOURCES
+
+# Initialize catkin workspace
+RUN cd $WS \
+    && catkin init \
+    && catkin config --extend $ROS_ROOT --skiplist hovergames_flight_identification testbench_identification
+
+# Update rosdep (ignore simulation and visualization packages)
+RUN echo -e "# ignore the keys given in this yaml file\nyaml file://$ROSDEP_SOURCES/rosdep_ignore_lab.yaml\n" | cat - $ROSDEP_SOURCES/20-default.list > temp && mv temp $ROSDEP_SOURCES/20-default.list
+RUN rosdep update
+
+# Install dependencies in catkin workspace
+RUN $GIT_ROOT/src/scripts/install_deps.sh $WS/src
+
+# Build all packages in the catkin workspace required for the drone_toolbox_ext_control_template package
+# NOTE: no solver is built yet, so we cannot build mpc_hovergames here. However, MAVROS nees to be build before the next step
+RUN cd $WS \
+    && source $ROS_ROOT/setup.bash \
+    && catkin build drone_toolbox_ext_control_template
+
+# Get geographic library dataset
+# NOTE: run this after building mavros!
+RUN cd $ROOT \
+    && wget https://raw.githubusercontent.com/mavlink/mavros/master/mavros/scripts/install_geographiclib_datasets.sh \
+    && bash ./install_geographiclib_datasets.sh
+
+# Append to $ROOT/.bashrc
+RUN echo -e "\n\
+source $ROS_ROOT/setup.bash\n\
+source $WS/devel/setup.bash\n\n\
+export EDITOR='vim'\n\n\
+alias shmpc='tmuxinator start hmpc-lab'\n\
+alias ahmpc='tmux a -t hmpc-lab'\n\
+alias khmpc='tmux kill-ses -t hmpc-lab'\n\n\
+alias cddev='cd $DEV'\n\
+alias cdgitroot='cd $GIT_ROOT'\n\
+alias cdws='cd $WS'\n\n\
+alias run_tc_lab='roslaunch drone_toolbox_ext_control_template controller.launch'\n\n\
+alias run_px4_1_base_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=1 mpc_layer_idx:=-1 gcs:=false > base.txt'\n\
+alias run_px4_1_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=1 mpc_layer_idx:=0 gcs:=false > smpc.txt'\n\
+alias run_px4_2_base_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=-1 gcs:=false > base.txt'\n\
+alias run_px4_2_0_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=0 gcs:=false > tmpc.txt'\n\
+alias run_px4_2_1_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=1 gcs:=false > pmpc.txt'\
+" >> $ROOT/.bashrc
+
+# Run a bash shell when starting the container
+CMD ["bash"]

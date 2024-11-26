@@ -1,0 +1,44 @@
+[submodule "src/PX4-Autopilot"]
+	path = src/PX4-Autopilot
+	url = git@github.com:cor-drone-dev/PX4-Autopilot.git
+	branch = drone/master
+[submodule "src/catkin_ws/src/DecompUtil"]
+	path = src/catkin_ws/src/DecompUtil
+	url = git@github.com:tud-amr/DecompUtil.git
+	branch = drone/dennis-paper-hmpc
+[submodule "src/catkin_ws/src/drone_toolbox"]
+	path = src/catkin_ws/src/drone_toolbox
+	url = git@github.com:dbenders1/drone_toolbox.git
+	branch = master
+[submodule "src/catkin_ws/src/drone_toolbox_ext_control_template"]
+	path = src/catkin_ws/src/drone_toolbox_ext_control_template
+	url = git@github.com:cor-drone-dev/drone_toolbox_ext_control_template.git
+	branch = drone/dennis-paper-hmpc
+[submodule "src/catkin_ws/src/mav_comm"]
+	path = src/catkin_ws/src/mav_comm
+	url = git@github.com:cor-drone-dev/mav_comm.git
+	branch = drone/master
+[submodule "src/catkin_ws/src/mavlink-gbp-release"]
+	path = src/catkin_ws/src/mavlink-gbp-release
+	url = git@github.com:cor-drone-dev/mavlink-gbp-release.git
+	branch = drone/master
+[submodule "src/catkin_ws/src/mavros"]
+	path = src/catkin_ws/src/mavros
+	url = git@github.com:cor-drone-dev/mavros.git
+	branch = drone/master
+[submodule "src/catkin_ws/src/mpc"]
+	path = src/catkin_ws/src/mpc
+	url = git@github.com:dbenders1/mpc.git
+	branch = master
+[submodule "src/catkin_ws/src/occupancygrid_creator"]
+	path = src/catkin_ws/src/occupancygrid_creator
+	url = git@github.com:R2CLab/occupancygrid_creator.git
+	branch = drone/dennis-paper-hmpc
+[submodule "src/catkin_ws/src/simple_sim"]
+	path = src/catkin_ws/src/simple_sim
+	url = git@github.com:dbenders1/simple_sim.git
+	branch = master
+[submodule "src/catkin_ws/src/vicon_bridge"]
+	path = src/catkin_ws/src/vicon_bridge
+	url = git@github.com:cor-mobile-robotics/vicon_bridge.git
+	branch = master

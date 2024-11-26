@@ -1,0 +1,46 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: HMPC
+message: >-
+  If you use this software, please cite it using the
+  metadata in this file.
+type: software
+authors:
+  - given-names: Dennis
+    family-names: Benders
+    email: d.benders@tudelft.nl
+    affiliation: Delft University of Technology
+    orcid: 'https://orcid.org/0000-0002-6648-7128'
+  - given-names: Johannes
+    family-names: Köhler
+    email: jkoehle@ethz.ch
+    affiliation: ETH Zürich
+    orcid: 'https://orcid.org/0000-0002-5556-604X'
+  - given-names: Thijs
+    family-names: Niesten
+    email: t.e.j.niesten@tudelft.nl
+    affiliation: Delft University of Technology
+    orcid: 'https://orcid.org/0009-0005-1658-3110'
+  - given-names: Robert
+    family-names: Babuška
+    email: r.babuska@tudelft.nl
+    affiliation: Delft University of Technology
+    orcid: 'https://orcid.org/0000-0001-9578-8598'
+  - given-names: Javier
+    family-names: Alonso-Mora
+    email: j.alonsomora@tudelft.nl
+    affiliation: Delft University of Technology
+    orcid: 'https://orcid.org/0000-0003-0058-570X'
+  - given-names: Laura
+    family-names: Ferranti
+    email: l.ferranti@tudelft.nl
+    affiliation: Delft University of Technology
+    orcid: 'https://orcid.org/0000-0003-3856-6221'
+keywords:
+  - Embedded Autonomous Mobile Robots
+  - Real-time Motion Planning and Tracking
+  - Hierarchical Model Predictive Control
+  - Obstacle Avoidance
+license: MIT

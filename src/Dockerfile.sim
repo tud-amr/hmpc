@@ -1,0 +1,185 @@
+# Select base image
+FROM osrf/ros:noetic-desktop-full
+
+# Set environment variables that persist in the container
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_DISTRO=noetic
+ENV ROS_ROOT=/opt/ros/$ROS_DISTRO
+ENV ROSDEP_SOURCES=/etc/ros/rosdep/sources.list.d
+ENV TZ=Europe/Amsterdam
+ENV ROOT=/root
+ENV USER=user
+ENV HOME_USER=/home/$USER
+ENV DEV=$ROOT/dev
+ENV PX4=$DEV/src/PX4-Autopilot
+ENV WS=$DEV/catkin_ws
+
+# Change the default shell to Bash to run RUN commands in this file
+SHELL [ "/bin/bash", "-c" ]
+
+# Install ubuntu packages
+RUN apt update \
+    && apt install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        git \
+        jq \
+        libopencv-dev \
+        openssh-client \
+        psmisc \
+        python3-catkin-tools \
+        python3-pip \
+        python3-venv \
+        ros-$ROS_DISTRO-plotjuggler-ros \
+        sudo \
+        tmux \
+        tmuxinator \
+        vim \
+        wget \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# PX4-specific instructions
+# ---------------------------------------------
+# Install ubuntu packages
+RUN apt update \
+    && apt install -y --no-install-recommends \
+        gcc-8 \
+        g++-8 \
+        xmlstarlet \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install pip packages
+RUN pip3 install kconfiglib \
+        packaging \
+        toml \
+        jinja2 \
+        jsonschema \
+        pyros-genmsg
+
+# Set gcc-8 to main compiler
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+# ---------------------------------------------
+
+# QGroundControl-specific instructions
+# ---------------------------------------------
+# Create a non-root user without password and set mode appropriately
+RUN useradd -m $USER \
+    && usermod -a -G dialout $USER
+
+# Install ubuntu packages
+RUN apt update \
+    && apt install -y --no-install-recommends \
+        gstreamer1.0-plugins-bad \
+        gstreamer1.0-libav \
+        gstreamer1.0-gl \
+        fuse \
+        libpulse-mainloop-glib0 \
+        libxcb-xinerama0 \
+        libxkbcommon-x11-0 libxcb-cursor0 \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p $HOME_USER/Downloads \
+    && cd $HOME_USER/Downloads \
+    && wget https://github.com/mavlink/qgroundcontrol/releases/download/v4.3.0/QGroundControl.AppImage \
+    && chmod +x ./QGroundControl.AppImage
+# ---------------------------------------------
+
+# MPC-specific instructions
+# ---------------------------------------------
+# Install pip packages
+RUN pip3 install dearpygui
+# ---------------------------------------------
+
+# Initialize catkin workspace
+RUN mkdir -p $WS/src \
+    && cd $WS \
+    && catkin init \
+    && catkin config --extend $ROS_ROOT --skiplist hovergames_flight_identification testbench_identification
+
+# Copy config files
+COPY config_files/.config $ROOT/.config
+COPY config_files/dotfiles $ROOT
+COPY config_files/rosdep_ignore_sim.yaml $ROSDEP_SOURCES
+
+# Copy PX4 files
+COPY px4_files/setup_px4.sh $ROOT
+
+# Copy scripts
+RUN mkdir -p $DEV/scripts
+COPY scripts $DEV/scripts
+
+# Copy PX4 repository and corresponding git information to prevent PX4 build from failing
+COPY PX4-Autopilot $PX4
+COPY .git/modules/src/PX4-Autopilot $DEV/.git/modules/src/PX4-Autopilot
+
+# Copy all repositories to make sure dependencies are correctly installed and packages with long build time can be built in advance
+COPY catkin_ws/src $WS/src
+
+# Update rosdep (ignore vicon_bridge)
+RUN echo -e "# ignore the keys given in this yaml file\nyaml file://$ROSDEP_SOURCES/rosdep_ignore_sim.yaml\n" | cat - $ROSDEP_SOURCES/20-default.list > temp && mv temp $ROSDEP_SOURCES/20-default.list
+RUN rosdep update
+
+# Install dependencies in PX4 and the catkin workspace
+RUN $DEV/scripts/install_deps.sh $PX4
+RUN $DEV/scripts/install_deps.sh $WS/src
+
+# Set up PX4
+RUN cd $PX4/Tools/setup \
+    && ./ubuntu.sh \
+    && cd $PX4 \
+    && source $ROS_ROOT/setup.bash \
+    && DONT_RUN=1 make px4_sitl_default gazebo
+
+# Build all packages in the catkin workspace required for the drone_toolbox_ext_control_template package
+# NOTE: no solver is built yet, so we cannot build mpc_hovergames here. However, MAVROS nees to be build before the next step
+RUN cd $WS \
+    && source $ROS_ROOT/setup.bash \
+    && catkin build drone_toolbox_ext_control_template
+
+# Get geographic library dataset
+# NOTE: run this after building mavros!
+RUN cd $ROOT \
+    && wget https://raw.githubusercontent.com/mavlink/mavros/master/mavros/scripts/install_geographiclib_datasets.sh \
+    && bash ./install_geographiclib_datasets.sh
+
+# Append to $ROOT/.bashrc
+RUN echo -e "\n\
+source $ROS_ROOT/setup.bash\n\
+source $WS/devel/setup.bash\n\n\
+source $ROOT/setup_px4.sh\n\n\
+export EDITOR='vim'\n\n\
+alias shmpc='tmuxinator start hmpc-sim'\n\
+alias ahmpc='tmux a -t hmpc-sim'\n\
+alias khmpc='tmux kill-ses -t hmpc-sim'\n\n\
+alias cddev='cd $DEV'\n\
+alias cdpx4='cd $PX4'\n\
+alias cdws='cd $WS'\n\n\
+alias qgc='sudo -u $USER $HOME_USER/Downloads/QGroundControl.AppImage'\n\
+alias run_tc_sim='roslaunch drone_toolbox_ext_control_template controller.launch sim:=true gazebo_gui:=true'\n\n\
+alias run_ss_1_base='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=simplesim mpc_n_layers:=1 mpc_layer_idx:=-1 gcs:=false > base.txt'\n\
+alias run_ss_1='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=simplesim mpc_n_layers:=1 mpc_layer_idx:=0 gcs:=false > smpc.txt'\n\
+alias run_px4_1_base_sim='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=px4 mpc_n_layers:=1 mpc_layer_idx:=-1 gcs:=false > base.txt'\n\
+alias run_px4_1_sim='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=px4 mpc_n_layers:=1 mpc_layer_idx:=0 gcs:=false > smpc.txt'\n\
+alias run_px4_1_base_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=1 mpc_layer_idx:=-1 gcs:=false > base.txt'\n\
+alias run_px4_1_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=1 mpc_layer_idx:=0 gcs:=false > smpc.txt'\n\
+alias run_gcs_1='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=1 mpc_layer_idx:=-1 gcs:=true > gcs.txt'\n\
+alias run_gcs_1_rec='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=1 mpc_layer_idx:=-1 gcs:=true rosbag_record:=true > gcs.txt'\n\
+alias run_ss_2_base='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=simplesim mpc_n_layers:=2 mpc_layer_idx:=-1 gcs:=false > base.txt'\n\
+alias run_ss_2_0='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=simplesim mpc_n_layers:=2 mpc_layer_idx:=0 gcs:=false > tmpc.txt'\n\
+alias run_ss_2_1='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=simplesim mpc_n_layers:=2 mpc_layer_idx:=1 gcs:=false > pmpc.txt'\n\
+alias run_px4_2_base_sim='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=-1 gcs:=false > base.txt'\n\
+alias run_px4_2_0_sim='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=0 gcs:=false > tmpc.txt'\n\
+alias run_px4_2_1_sim='roslaunch mpc_hovergames main.launch sim:=true mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=1 gcs:=false > pmpc.txt'\n\
+alias run_px4_2_base_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=-1 gcs:=false > base.txt'\n\
+alias run_px4_2_0_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=0 gcs:=false > tmpc.txt'\n\
+alias run_px4_2_1_lab='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=1 gcs:=false > pmpc.txt'\n\
+alias run_gcs_2='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=-1 gcs:=true > gcs.txt'\n\
+alias run_gcs_2_rec='roslaunch mpc_hovergames main.launch sim:=false mpc_interface:=px4 mpc_n_layers:=2 mpc_layer_idx:=-1 gcs:=true rosbag_record:=true > gcs.txt'\
+" >> $ROOT/.bashrc
+
+# Run a bash shell when starting the container
+CMD ["bash"]

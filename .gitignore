@@ -1,0 +1,9 @@
+# Visual Studio Code
+.vscode/*
+
+# Generated txt files
+**/base.txt
+**/gcs.txt
+**/pmpc.txt
+**/smpc.txt
+**/tmpc.txt

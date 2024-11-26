@@ -1,0 +1,38 @@
+name: hmpc-lab
+root: ~/
+
+windows:
+  - build:
+      layout: bc5d,274x72,0,0,0
+      panes:
+        - clear && cdws && history -s "catkin build "
+  - roscore:
+      layout: 5ce0,211x53,0,0,11
+      panes:
+        - clear && history -s "roscore"
+  - run:
+      layout: 7786,203x58,0,0[203x18,0,0{101x18,0,0,1,101x18,102,0,11},203x39,0,19{101x39,0,19,10,101x39,102,19,12}]
+      panes:
+        - clear && cdws && cd src && history -s "run_px4_1_base_lab" && history -s "run_px4_2_base_lab"
+        - clear && roscd mpc_hovergames && cd scripts && history -s "python3 goal_publisher_gui.py" && history -s "python3 goal_publisher.py --exp_type exp --d_min 0.02 --d_dim 2 --goals -2 -1.4 1.4 0 2 1.4 1.4 0" && history -s "python3 goal_publisher.py --exp_type exp --d_min 0.02 --d_dim 2 --goals -2.2 -1.4 1.4 0 2.2 1.4 1.4 0"
+        - clear && cdws && cd src && history -s "run_px4_1_lab" && history -s "run_px4_2_0_lab"
+        - clear && cdws && cd src && history -s "run_px4_2_1_lab"
+  - rostopic:
+      layout: bc5f,274x72,0,0,2
+      panes:
+        - clear && history -s "rostopic echo "
+  - rviz:
+      layout: 5a66,211x53,0,0[211x14,0,0,3,211x38,0,15{105x38,0,15,6,105x38,106,15,7}]
+      panes:
+        - clear && history -s "roscore"
+        - clear && history -s "rviz"
+        - clear && cd .ros && history -s "rosbag play " && history -s "ls -al --sort=time -r"
+  - profiling:
+      layout: dd8a,274x72,0,0{137x72,0,0,12,136x72,138,0,13}
+      panes:
+        - clear && roscd simple_sim && cd profiling && history -s "cp simple_sim_hovergames_profiler.json ../../mpc/mpc_tools/profiling/"
+        - clear && roscd mpc_tools && cd profiling && history -s "./concatenate_profiling.sh "
+  - rec_data:
+      layout: 5ce0,211x53,0,0,11
+      panes:
+        - clear && roscd mpc_tools && cd recorded_data && history -s "ls -al --sort=time -r"

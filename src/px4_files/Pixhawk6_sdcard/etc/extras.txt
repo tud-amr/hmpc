@@ -1,0 +1,8 @@
+mavlink start -u 14540 -r 100000
+mavlink stream -u 14540 -s ATTITUDE -r 100
+mavlink stream -u 14540 -s ATTITUDE_TARGET -r 100
+mavlink stream -u 14540 -s LOCAL_POSITION_NED -r 100
+mavlink stream -u 14540 -s HOVER_THRUST_ESTIMATE -r 100
+mavlink stream -u 14540 -s SYS_STATUS -r 100
+
+usleep 100000
